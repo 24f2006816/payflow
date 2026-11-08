@@ -1,0 +1,5 @@
+# Profile "local": http webhooks to private hosts allowed (docker-compose network).
+payflow:
+  webhooks:
+    allow-insecure-http: true
+    allow-private-hosts: true

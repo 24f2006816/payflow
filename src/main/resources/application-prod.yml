@@ -1,0 +1,9 @@
+# Profile "prod": JSON (Elastic Common Schema) logs for CloudWatch / Loki, strict webhook URL policy.
+logging:
+  structured:
+    format:
+      console: ecs
+payflow:
+  webhooks:
+    allow-insecure-http: false
+    allow-private-hosts: false

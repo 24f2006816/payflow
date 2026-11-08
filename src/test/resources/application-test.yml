@@ -1,0 +1,17 @@
+payflow:
+  psp:
+    latency: 0ms
+    transient-failure-rate: 0.0
+  outbox:
+    poll-interval: 100ms
+  webhooks:
+    poll-interval: 200ms
+    base-backoff: 100ms
+    max-backoff: 1s
+    max-attempts: 3
+  rate-limit:
+    requests-per-minute: 100000
+  reconciliation:
+    cron: "-"          # disabled; tests trigger reconciliation explicitly
+  topups:
+    recovery-interval: 1h

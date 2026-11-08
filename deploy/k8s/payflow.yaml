@@ -1,0 +1,116 @@
+# Kubernetes manifests (EKS or any cluster). Postgres (RDS), Redis (ElastiCache) and Kafka (MSK) are
+# expected to be managed services; their endpoints come from the ConfigMap / Secret below.
+# Apply: kubectl apply -f deploy/k8s/payflow.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payflow
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payflow-config
+  namespace: payflow
+data:
+  SPRING_PROFILES_ACTIVE: prod
+  DB_URL: jdbc:postgresql://REPLACE_RDS_ENDPOINT:5432/payflow?sslmode=require
+  REDIS_HOST: REPLACE_ELASTICACHE_ENDPOINT
+  KAFKA_BOOTSTRAP_SERVERS: REPLACE_MSK_BOOTSTRAP:9092
+  JWT_ISSUER: https://payments.example.com
+---
+# In production, source these from AWS Secrets Manager via the External Secrets Operator.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: payflow-secrets
+  namespace: payflow
+type: Opaque
+stringData:
+  DB_USERNAME: payflow
+  DB_PASSWORD: REPLACE_ME
+  JWT_SECRET: REPLACE_WITH_AT_LEAST_32_RANDOM_BYTES
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payflow
+  namespace: payflow
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: payflow }
+  strategy:
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app: payflow }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8080"
+    spec:
+      terminationGracePeriodSeconds: 40
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: payflow
+          image: REPLACE_ACCOUNT.dkr.ecr.REPLACE_REGION.amazonaws.com/payflow:REPLACE_TAG
+          ports: [{ containerPort: 8080 }]
+          envFrom:
+            - configMapRef: { name: payflow-config }
+            - secretRef: { name: payflow-secrets }
+          resources:
+            requests: { cpu: 500m, memory: 768Mi }
+            limits: { memory: 1Gi }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            initialDelaySeconds: 40
+            periodSeconds: 10
+          lifecycle:
+            preStop:
+              exec: { command: ["sh", "-c", "sleep 10"] }  # let the load balancer drain first
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payflow
+  namespace: payflow
+spec:
+  selector: { app: payflow }
+  ports: [{ port: 80, targetPort: 8080 }]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payflow
+  namespace: payflow
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: payflow }
+  minReplicas: 3
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 65 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payflow
+  namespace: payflow
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels: { app: payflow }

@@ -1,0 +1,5 @@
+# Profile "seed": loads demo merchants, API clients and wallets (src/main/resources/db/seed).
+# Used by docker-compose and the integration tests. NEVER enable in production.
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed

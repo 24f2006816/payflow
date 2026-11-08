@@ -1,0 +1,8 @@
+target
+.git
+.idea
+*.iml
+.env
+docs
+postman
+deploy
