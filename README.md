@@ -1,12 +1,15 @@
 # PayFlow — Distributed Payment Processing Platform
 
 [![CI](https://github.com/24f2006816/payflow/actions/workflows/ci.yml/badge.svg)](https://github.com/24f2006816/payflow/actions/workflows/ci.yml)
+[![Live Console on Vercel](https://img.shields.io/badge/Live_Demo-payflow--five--sable.vercel.app-000000?logo=vercel&logoColor=white)](https://payflow-five-sable.vercel.app)
 ![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5.16-6DB33F?logo=springboot&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![Kafka](https://img.shields.io/badge/Apache_Kafka-3.9_(KRaft)-231F20?logo=apachekafka&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+
+> **Live Interactive Console (Vercel):** **[https://payflow-five-sable.vercel.app](https://payflow-five-sable.vercel.app)** — Try the double-entry ledger, idempotent payment lifecycle (`top-up` → `authorize` → `replay` → `partial capture` → `refund` → `reconcile`), and `HMAC-SHA256` webhook inspector directly in your browser.
 
 **PayFlow** is a production-grade financial ledger and payment processing backend engineered with the architectural guarantees used by modern fintech platforms:
 

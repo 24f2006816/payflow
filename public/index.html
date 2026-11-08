@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PayFlow — Distributed Payment Processing & Double-Entry Ledger Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #090d16; color: #e2e8f0; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .glass { background: rgba(15, 23, 42, 0.78); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.6); }
+    .pulse-dot { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  </style>
+</head>
+<body class="min-h-screen antialiased selection:bg-indigo-500 selection:text-white">
+  <!-- Top Header -->
+  <header class="border-b border-slate-800/80 bg-slate-950/90 sticky top-0 z-30 backdrop-blur">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="h-9 w-9 rounded-lg bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">PF</div>
+        <div>
+          <div class="flex items-center gap-2.5">
+            <h1 class="font-bold text-lg tracking-tight text-white">PayFlow Console</h1>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-medium flex items-center gap-1.5">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 pulse-dot"></span>
+              Double-Entry Ledger Active
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Java 21 · Spring Boot 3.5 · PostgreSQL 16 · Redis 7 · Apache Kafka (KRaft) · Resilience4j</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <span id="ReconcileBadge" class="text-xs mono px-2.5 py-1 rounded-md bg-slate-900 border border-slate-700 text-slate-300">
+          ∑ Global Ledger Sum: <strong class="text-emerald-400">₹0.00 (Balanced)</strong>
+        </span>
+        <a href="https://github.com/24f2006816/payflow" target="_blank" rel="noopener"
+           class="text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+          GitHub (24f2006816/payflow)
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <!-- Account Balances Row -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <div class="glass rounded-xl p-4 border-l-4 border-l-indigo-500">
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-medium text-slate-400">CUSTOMER_WALLET</span>
+          <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300">3333…3333</span>
+        </div>
+        <div id="bal-wallet" class="text-2xl font-bold text-white mt-1.5 mono">₹425.00</div>
+        <div id="bal-wallet-minor" class="text-xs text-slate-400 mono mt-0.5">42,500 paise · No-Overdraft</div>
+      </div>
+
+      <div class="glass rounded-xl p-4 border-l-4 border-l-amber-500">
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-medium text-slate-400">PLATFORM_HOLDS</span>
+          <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300">Auth Escrow</span>
+        </div>
+        <div id="bal-holds" class="text-2xl font-bold text-white mt-1.5 mono">₹0.00</div>
+        <div id="bal-holds-minor" class="text-xs text-slate-400 mono mt-0.5">0 paise · Reserved Funds</div>
+      </div>
+
+      <div class="glass rounded-xl p-4 border-l-4 border-l-emerald-500">
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-medium text-slate-400">MERCHANT_BALANCE</span>
+          <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300">Acme Foods</span>
+        </div>
+        <div id="bal-merchant" class="text-2xl font-bold text-white mt-1.5 mono">₹73.00</div>
+        <div id="bal-merchant-minor" class="text-xs text-slate-400 mono mt-0.5">7,300 paise · Settled Net</div>
+      </div>
+
+      <div class="glass rounded-xl p-4 border-l-4 border-l-purple-500">
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-medium text-slate-400">PLATFORM_FEES</span>
+          <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300">200 bps (2%)</span>
+        </div>
+        <div id="bal-fees" class="text-2xl font-bold text-white mt-1.5 mono">₹2.00</div>
+        <div id="bal-fees-minor" class="text-xs text-slate-400 mono mt-0.5">200 paise · Revenue</div>
+      </div>
+
+      <div class="glass rounded-xl p-4 border-l-4 border-l-rose-500">
+        <div class="flex justify-between items-start">
+          <span class="text-xs font-medium text-slate-400">PSP_CLEARING</span>
+          <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300">External PSP</span>
+        </div>
+        <div id="bal-psp" class="text-2xl font-bold text-white mt-1.5 mono">-₹500.00</div>
+        <div id="bal-psp-minor" class="text-xs text-slate-400 mono mt-0.5">-50,000 paise · Receivable</div>
+      </div>
+    </section>
+
+    <!-- Interactive Operations + Payment Lifecycle State -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Left: Interactive API Simulator Controls -->
+      <div class="lg:col-span-5 glass rounded-xl p-5 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div>
+            <h2 class="text-sm font-semibold text-white uppercase tracking-wider">Interactive Payment Operations</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Execute idempotent API calls against the double-entry engine</p>
+          </div>
+          <button onclick="runFullDemo()" class="text-xs px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 font-semibold text-white shadow transition">
+            ▶ Run Full Demo Script
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <button onclick="opTopup()" class="p-3 rounded-lg bg-slate-900 hover:bg-slate-800/90 border border-slate-700/80 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-indigo-400 group-hover:text-indigo-300">1. POST /v1/topups</span>
+              <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">+50,000p</span>
+            </div>
+            <p class="text-xs text-slate-300 mt-1 font-medium">Top-Up Wallet (₹500.00)</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">PSP Clearing → Customer Wallet</p>
+          </button>
+
+          <button onclick="opAuthorize()" class="p-3 rounded-lg bg-slate-900 hover:bg-slate-800/90 border border-slate-700/80 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-amber-400 group-hover:text-amber-300">2. POST /v1/payments</span>
+              <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">12,000p</span>
+            </div>
+            <p class="text-xs text-slate-300 mt-1 font-medium">Authorize Payment (₹120.00)</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Locks Wallet FOR UPDATE → Holds</p>
+          </button>
+
+          <button onclick="opReplay()" class="p-3 rounded-lg bg-slate-900 hover:bg-slate-800/90 border border-slate-700/80 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-cyan-400 group-hover:text-cyan-300">3. Retry Same Key</span>
+              <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300">Idempotent</span>
+            </div>
+            <p class="text-xs text-slate-300 mt-1 font-medium">Replay Timed-Out Request</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Returns stored response (0 drift)</p>
+          </button>
+
+          <button onclick="opCapture()" class="p-3 rounded-lg bg-slate-900 hover:bg-slate-800/90 border border-slate-700/80 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-emerald-400 group-hover:text-emerald-300">4. POST …/capture</span>
+              <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">10,000p</span>
+            </div>
+            <p class="text-xs text-slate-300 mt-1 font-medium">Partial Capture (₹100.00)</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">₹98 Merchant · ₹2 Fee · ₹20 Released</p>
+          </button>
+
+          <button onclick="opRefund()" class="p-3 rounded-lg bg-slate-900 hover:bg-slate-800/90 border border-slate-700/80 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-rose-400 group-hover:text-rose-300">5. POST …/refunds</span>
+              <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">2,500p</span>
+            </div>
+            <p class="text-xs text-slate-300 mt-1 font-medium">Partial Refund (₹25.00)</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Merchant Balance → Customer Wallet</p>
+          </button>
+
+          <button onclick="opReconcile()" class="p-3 rounded-lg bg-slate-900 hover:bg-slate-800/90 border border-slate-700/80 text-left transition group">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-purple-400 group-hover:text-purple-300">6. Reconciliation</span>
+              <span class="text-[10px] mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300">REPEATABLE READ</span>
+            </div>
+            <p class="text-xs text-slate-300 mt-1 font-medium">Verify Ledger Invariants</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Checks ∑ postings == 0 & balances</p>
+          </button>
+        </div>
+
+        <!-- Live API Response Console -->
+        <div class="pt-2">
+          <div class="flex items-center justify-between text-xs text-slate-400 mb-1.5">
+            <span class="font-medium">Last API Response & Headers</span>
+            <span id="api-status-badge" class="mono text-emerald-400">HTTP 200 OK · Idempotent-Replayed: false</span>
+          </div>
+          <pre id="api-console" class="mono text-xs bg-slate-950 border border-slate-800 rounded-lg p-3.5 text-emerald-300 overflow-x-auto max-h-52">{
+  "status": "PASSED",
+  "accountsChecked": 9,
+  "mismatches": 0,
+  "globalPostingSum": 0,
+  "activePayment": {
+    "id": "ca89b5d5-3fd4-46fc-8e83-e3e6f465216a",
+    "status": "PARTIALLY_REFUNDED",
+    "amountMinor": 12000,
+    "capturedMinor": 10000,
+    "refundedMinor": 2500,
+    "feeMinor": 200
+  }
+}</pre>
+        </div>
+      </div>
+
+      <!-- Right: Immutable Double-Entry Ledger Postings & Signed Webhooks -->
+      <div class="lg:col-span-7 space-y-6">
+        <!-- Double-Entry Postings Table -->
+        <div class="glass rounded-xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-sm font-semibold text-white uppercase tracking-wider">Immutable Double-Entry Ledger Postings</h2>
+              <p class="text-xs text-slate-400">Enforced by PostgreSQL <code class="text-indigo-300">DEFERRABLE INITIALLY DEFERRED</code> trigger (<code class="text-emerald-300">SUM(amount_minor) = 0</code>)</p>
+            </div>
+            <span id="entry-count" class="text-xs mono px-2.5 py-1 rounded bg-slate-900 border border-slate-700 text-slate-300">4 Journal Entries</span>
+          </div>
+          <div class="overflow-x-auto max-h-64">
+            <table class="w-full text-left border-collapse text-xs mono">
+              <thead>
+                <tr class="border-b border-slate-800 text-slate-400">
+                  <th class="py-2 pr-3">Journal Entry</th>
+                  <th class="py-2 pr-3">Operation</th>
+                  <th class="py-2 pr-3">Account</th>
+                  <th class="py-2 pr-3 text-right">Signed Delta (Minor)</th>
+                  <th class="py-2 text-right">Entry Sum</th>
+                </tr>
+              </thead>
+              <tbody id="ledger-tbody" class="divide-y divide-slate-800/60"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Transactional Outbox -> Kafka -> Signed Webhook Inspector -->
+        <div class="glass rounded-xl p-5">
+          <div class="flex items-center justify-between mb-2.5">
+            <div>
+              <h2 class="text-sm font-semibold text-white uppercase tracking-wider">Transactional Outbox → Kafka → HMAC-SHA256 Webhook Sink</h2>
+              <p class="text-xs text-slate-400">Topic: <code class="text-amber-300">payflow.payment-events</code> · Header: <code class="text-emerald-300">PayFlow-Signature: t=&lt;epoch&gt;,v1=&lt;hmac_sha256&gt;</code></p>
+            </div>
+            <span class="text-[11px] mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">200 OK Delivered</span>
+          </div>
+          <pre id="webhook-console" class="mono text-xs bg-slate-950 border border-slate-800 rounded-lg p-3.5 text-slate-300 overflow-x-auto max-h-48">POST /hooks/acme HTTP/1.1
+Host: webhook-sink:8080
+Content-Type: application/json
+PayFlow-Event-Id: 76712acf-c3ea-4a4b-85e7-9c154f7c7ceb
+PayFlow-Event-Type: payment.captured
+PayFlow-Signature: t=1794126879,v1=e7c29fff5201424d08df02c2ea13f451ef5bd4ab9c2852e363be55e5d7e836fa
+
+{
+  "id": "76712acf-c3ea-4a4b-85e7-9c154f7c7ceb",
+  "type": "payment.captured",
+  "merchantId": "11111111-1111-1111-1111-111111111111",
+  "aggregateType": "payment",
+  "aggregateId": "ca89b5d5-3fd4-46fc-8e83-e3e6f465216a",
+  "data": {
+    "paymentId": "ca89b5d5-3fd4-46fc-8e83-e3e6f465216a",
+    "status": "CAPTURED",
+    "amountMinor": 12000,
+    "capturedMinor": 10000,
+    "feeMinor": 200,
+    "currency": "INR"
+  }
+}</pre>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const state = {
+      wallet: 42500,
+      holds: 0,
+      merchant: 7300,
+      fees: 200,
+      psp: -50000,
+      lastAuthId: "ca89b5d5-3fd4-46fc-8e83-e3e6f465216a",
+      lastAuthKey: "idem-auth-ca89b5d5",
+      lastAuthAmount: 12000,
+      lastAuthStatus: "PARTIALLY_REFUNDED",
+      capturedMinor: 10000,
+      refundedMinor: 2500,
+      entries: [
+        { id: "4e373727", op: "REFUND", lines: [["CUSTOMER_WALLET", +2500], ["MERCHANT_BALANCE", -2500]] },
+        { id: "f5774f04", op: "CAPTURE", lines: [["PLATFORM_HOLDS", -12000], ["CUSTOMER_WALLET", +2000], ["MERCHANT_BALANCE", +9800], ["PLATFORM_FEES", +200]] },
+        { id: "14d06007", op: "AUTHORIZE", lines: [["CUSTOMER_WALLET", -12000], ["PLATFORM_HOLDS", +12000]] },
+        { id: "f0e5ca3a", op: "TOPUP", lines: [["CUSTOMER_WALLET", +50000], ["PSP_CLEARING", -50000]] }
+      ]
+    };
+
+    function fmtINR(minor) {
+      const sign = minor < 0 ? "-" : "";
+      return sign + "₹" + (Math.abs(minor) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function shortId() {
+      return crypto.randomUUID().split("-")[0];
+    }
+
+    function render() {
+      document.getElementById("bal-wallet").textContent = fmtINR(state.wallet);
+      document.getElementById("bal-wallet-minor").textContent = `${state.wallet.toLocaleString()} paise · No-Overdraft`;
+      document.getElementById("bal-holds").textContent = fmtINR(state.holds);
+      document.getElementById("bal-holds-minor").textContent = `${state.holds.toLocaleString()} paise · Reserved Funds`;
+      document.getElementById("bal-merchant").textContent = fmtINR(state.merchant);
+      document.getElementById("bal-merchant-minor").textContent = `${state.merchant.toLocaleString()} paise · Settled Net`;
+      document.getElementById("bal-fees").textContent = fmtINR(state.fees);
+      document.getElementById("bal-fees-minor").textContent = `${state.fees.toLocaleString()} paise · Revenue`;
+      document.getElementById("bal-psp").textContent = fmtINR(state.psp);
+      document.getElementById("bal-psp-minor").textContent = `${state.psp.toLocaleString()} paise · Receivable`;
+
+      const sum = state.wallet + state.holds + state.merchant + state.fees + state.psp;
+      document.getElementById("ReconcileBadge").innerHTML =
+        `∑ Global Ledger Sum: <strong class="text-emerald-400">${fmtINR(sum)} (${sum === 0 ? "Balanced" : "DRIFT"})</strong>`;
+      document.getElementById("entry-count").textContent = `${state.entries.length} Journal Entries`;
+
+      const tbody = document.getElementById("ledger-tbody");
+      tbody.innerHTML = "";
+      state.entries.forEach(e => {
+        e.lines.forEach((line, idx) => {
+          const tr = document.createElement("tr");
+          const delta = line[1];
+          const color = delta > 0 ? "text-emerald-400" : "text-rose-400";
+          tr.innerHTML = `
+            <td class="py-1.5 pr-3 text-slate-400">${idx === 0 ? e.id + "…" : ""}</td>
+            <td class="py-1.5 pr-3 font-semibold text-indigo-300">${idx === 0 ? e.op : ""}</td>
+            <td class="py-1.5 pr-3 text-slate-300">${line[0]}</td>
+            <td class="py-1.5 pr-3 text-right font-medium ${color}">${delta > 0 ? "+" + delta.toLocaleString() : delta.toLocaleString()}</td>
+            <td class="py-1.5 text-right text-emerald-400">${idx === e.lines.length - 1 ? "0" : ""}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      });
+    }
+
+    function updateWebhook(type, data) {
+      const evId = crypto.randomUUID();
+      const ts = Math.floor(Date.now() / 1000);
+      const fakeHmac = Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b => b.toString(16).padStart(2, "0")).join("");
+      const body = {
+        id: evId,
+        type,
+        merchantId: "11111111-1111-1111-1111-111111111111",
+        aggregateType: "payment",
+        aggregateId: state.lastAuthId,
+        occurredAt: new Date().toISOString(),
+        data
+      };
+      document.getElementById("webhook-console").textContent =
+`POST /hooks/acme HTTP/1.1
+Host: webhook-sink:8080
+Content-Type: application/json
+PayFlow-Event-Id: ${evId}
+PayFlow-Event-Type: ${type}
+PayFlow-Signature: t=${ts},v1=${fakeHmac}
+
+${JSON.stringify(body, null, 2)}`;
+    }
+
+    function opTopup() {
+      state.wallet += 50000;
+      state.psp -= 50000;
+      const id = crypto.randomUUID();
+      state.entries.unshift({ id: id.split("-")[0], op: "TOPUP", lines: [["CUSTOMER_WALLET", +50000], ["PSP_CLEARING", -50000]] });
+      document.getElementById("api-status-badge").textContent = "HTTP 201 Created · Idempotent-Replayed: false";
+      document.getElementById("api-console").textContent = JSON.stringify({
+        id,
+        accountId: "33333333-3333-3333-3333-333333333333",
+        amountMinor: 50000,
+        currency: "INR",
+        status: "SUCCEEDED",
+        pspReference: "psp_" + shortId()
+      }, null, 2);
+      render();
+    }
+
+    function opAuthorize() {
+      if (state.wallet < 12000) {
+        alert("Insufficient wallet balance! Click Top-Up Wallet first.");
+        return;
+      }
+      state.wallet -= 12000;
+      state.holds += 12000;
+      state.lastAuthId = crypto.randomUUID();
+      state.lastAuthKey = "idem-" + shortId();
+      state.lastAuthStatus = "AUTHORIZED";
+      state.capturedMinor = 0;
+      state.refundedMinor = 0;
+      state.entries.unshift({ id: shortId(), op: "AUTHORIZE", lines: [["CUSTOMER_WALLET", -12000], ["PLATFORM_HOLDS", +12000]] });
+      const resp = {
+        id: state.lastAuthId,
+        merchantId: "11111111-1111-1111-1111-111111111111",
+        customerAccountId: "33333333-3333-3333-3333-333333333333",
+        amountMinor: 12000,
+        capturedMinor: 0,
+        refundedMinor: 0,
+        currency: "INR",
+        status: "AUTHORIZED"
+      };
+      document.getElementById("api-status-badge").textContent = `HTTP 201 Created · Idempotency-Key: ${state.lastAuthKey}`;
+      document.getElementById("api-console").textContent = JSON.stringify(resp, null, 2);
+      updateWebhook("payment.authorized", resp);
+      render();
+    }
+
+    function opReplay() {
+      document.getElementById("api-status-badge").textContent = `HTTP 201 Created · Idempotent-Replayed: true (${state.lastAuthKey})`;
+      document.getElementById("api-console").textContent = JSON.stringify({
+        id: state.lastAuthId,
+        status: state.lastAuthStatus,
+        amountMinor: 12000,
+        idempotentReplay: true,
+        note: "Exact stored response replayed from idempotency_keys table — customer was NOT charged twice."
+      }, null, 2);
+    }
+
+    function opCapture() {
+      if (state.holds < 12000) {
+        opAuthorize();
+      }
+      state.holds -= 12000;
+      state.wallet += 2000;
+      state.merchant += 9800;
+      state.fees += 200;
+      state.lastAuthStatus = "CAPTURED";
+      state.capturedMinor = 10000;
+      state.entries.unshift({
+        id: shortId(),
+        op: "CAPTURE",
+        lines: [["PLATFORM_HOLDS", -12000], ["CUSTOMER_WALLET", +2000], ["MERCHANT_BALANCE", +9800], ["PLATFORM_FEES", +200]]
+      });
+      const resp = {
+        id: state.lastAuthId,
+        status: "CAPTURED",
+        amountMinor: 12000,
+        capturedMinor: 10000,
+        releasedMinor: 2000,
+        feeMinor: 200,
+        currency: "INR"
+      };
+      document.getElementById("api-status-badge").textContent = "HTTP 200 OK · Idempotent-Replayed: false";
+      document.getElementById("api-console").textContent = JSON.stringify(resp, null, 2);
+      updateWebhook("payment.captured", resp);
+      render();
+    }
+
+    function opRefund() {
+      if (state.merchant < 2500) {
+        opCapture();
+      }
+      state.merchant -= 2500;
+      state.wallet += 2500;
+      state.refundedMinor += 2500;
+      state.lastAuthStatus = "PARTIALLY_REFUNDED";
+      state.entries.unshift({
+        id: shortId(),
+        op: "REFUND",
+        lines: [["CUSTOMER_WALLET", +2500], ["MERCHANT_BALANCE", -2500]]
+      });
+      const resp = {
+        id: state.lastAuthId,
+        status: "PARTIALLY_REFUNDED",
+        capturedMinor: state.capturedMinor || 10000,
+        refundedMinor: state.refundedMinor,
+        reason: "damaged item",
+        currency: "INR"
+      };
+      document.getElementById("api-status-badge").textContent = "HTTP 200 OK · Idempotent-Replayed: false";
+      document.getElementById("api-console").textContent = JSON.stringify(resp, null, 2);
+      updateWebhook("payment.refunded", resp);
+      render();
+    }
+
+    function opReconcile() {
+      const sum = state.wallet + state.holds + state.merchant + state.fees + state.psp;
+      document.getElementById("api-status-badge").textContent = "HTTP 200 OK · Isolation: REPEATABLE_READ";
+      document.getElementById("api-console").textContent = JSON.stringify({
+        id: crypto.randomUUID(),
+        status: sum === 0 ? "PASSED" : "FAILED",
+        accountsChecked: 9,
+        mismatchesFound: 0,
+        globalPostingSumMinor: sum,
+        negativeCustomerWallets: 0
+      }, null, 2);
+    }
+
+    async function runFullDemo() {
+      opTopup();
+      await new Promise(r => setTimeout(r, 350));
+      opAuthorize();
+      await new Promise(r => setTimeout(r, 350));
+      opReplay();
+      await new Promise(r => setTimeout(r, 350));
+      opCapture();
+      await new Promise(r => setTimeout(r, 350));
+      opRefund();
+      await new Promise(r => setTimeout(r, 350));
+      opReconcile();
+    }
+
+    render();
+  </script>
+</body>
+</html>
